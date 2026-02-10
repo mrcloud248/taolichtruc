@@ -183,5 +183,5 @@ MIT License - Free to use and modify
 
 ## Tác giả
 
-Phát triển bởi [Your Name]
+Phát triển bởi [DucViet]
 Version 1.0.0 - 2026
