@@ -1,0 +1,12 @@
+# Protect exports directory
+# Only allow access to CSV/Excel files via PHP script
+
+<Files "*">
+    Order Deny,Allow
+    Deny from all
+</Files>
+
+<FilesMatch "\.(csv|xls|xlsx)$">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>

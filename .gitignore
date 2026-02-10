@@ -1,0 +1,41 @@
+# Config files with sensitive information
+config/database.php
+
+# Export files
+exports/*.xlsx
+exports/*.xls
+exports/*.csv
+!exports/.htaccess
+
+# Cache & temp files
+*.log
+*.tmp
+*.cache
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Node modules (if any)
+node_modules/
+
+# Vendor (if using Composer)
+vendor/
+
+# Environment files
+.env
+.env.local
