@@ -25,7 +25,7 @@ Web application quản lý và tự động phân công lịch trực cho nhân 
 ### 1. Upload lên hosting
 
 #### Cách 1: Upload file ZIP
-1. Tải file `schedule-management.zip`
+1. Nén file zip, rồi upload lên hosting
 2. Đăng nhập vào cPanel/Hosting Control Panel
 3. Vào File Manager
 4. Upload file ZIP vào thư mục `public_html` (hoặc `www`, `htdocs`)
@@ -34,7 +34,7 @@ Web application quản lý và tự động phân công lịch trực cho nhân 
 #### Cách 2: Clone từ GitHub
 ```bash
 cd public_html
-git clone https://github.com/[username]/schedule-management.git
+git clone https://github.com/mrcloud248/taolichtruc.git
 cd schedule-management
 ```
 
@@ -42,7 +42,7 @@ cd schedule-management
 
 1. Đăng nhập vào phpMyAdmin
 2. Tạo database mới (ví dụ: `schedule_management`)
-3. Import file `database/schedule_db.sql`
+3. Import file `database/demo_taolich.sql`
 
 ### 3. Cấu hình database
 
