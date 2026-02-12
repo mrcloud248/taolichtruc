@@ -43,7 +43,7 @@ class Schedule {
     }
     
     /**
-     * Generate daily schedule for a month
+     * Generate daily schedule for a month with advanced constraint satisfaction
      */
     public function generateDailySchedule($month, $year, $firstDayStaffId, $generatedBy, $staffIds = null) {
         // Define shift times
@@ -56,14 +56,12 @@ class Schedule {
         
         // Get active staff
         if ($staffIds && is_array($staffIds) && count($staffIds) > 0) {
-            // Filter staff list by selected IDs
             $allStaff = $this->staffModel->getAllActive();
             $staffList = array_filter($allStaff, function($staff) use ($staffIds) {
                 return in_array($staff['id'], $staffIds);
             });
-            $staffList = array_values($staffList); // Re-index array
+            $staffList = array_values($staffList);
         } else {
-            // Use all active staff
             $staffList = $this->staffModel->getAllActive();
         }
         
@@ -71,169 +69,144 @@ class Schedule {
             return ['success' => false, 'message' => 'Không có nhân viên nào'];
         }
         
+        $staffCount = count($staffList);
+        $staffIds = array_map(function($s) { return $s['id']; }, $staffList);
+        
         // Create schedule record
         $scheduleId = $this->create(SCHEDULE_DAILY, $month, $year, $generatedBy);
         if (!$scheduleId) {
             return ['success' => false, 'message' => 'Không thể tạo lịch'];
         }
         
-        // Get all dates in month
+        // Get all dates and calculate total shifts needed
         $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
-        $assignments = [];
+        $shifts = []; // Array of [date, dayOfMonth, dayOfWeek, shiftType]
         
-        // Assign first day
-        $firstDate = sprintf("%04d-%02d-01", $year, $month);
-        $dayOfWeek = date('N', strtotime($firstDate));
-        
-        // Create staff pool for fair distribution FIRST
-        $totalSlots = 0;
         for ($day = 1; $day <= $daysInMonth; $day++) {
             $date = sprintf("%04d-%02d-%02d", $year, $month, $day);
-            $dayOfWeekTemp = date('N', strtotime($date));
-            $totalSlots += ($dayOfWeekTemp == 7) ? 2 : 1; // Sunday has 2 shifts
-        }
-        
-        $shiftsPerStaff = ceil($totalSlots / count($staffList));
-        $staffPool = [];
-        
-        foreach ($staffList as $staff) {
-            for ($i = 0; $i < $shiftsPerStaff; $i++) {
-                $staffPool[] = $staff['id'];
-            }
-        }
-        
-        shuffle($staffPool);
-        $poolIndex = 0;
-        
-        // Now assign first day
-        if ($dayOfWeek == 7) { // Sunday - assign only morning shift to first staff
-            $this->addShift($scheduleId, $firstDayStaffId, $firstDate, SHIFT_SUNDAY_MORNING, 
-                          $SHIFT_TIMES[SHIFT_SUNDAY_MORNING]['start'], 
-                          $SHIFT_TIMES[SHIFT_SUNDAY_MORNING]['end']);
-            $assignments[$firstDate] = [$firstDayStaffId];
+            $dayOfWeek = date('N', strtotime($date)); // 1=Monday, 7=Sunday
             
-            // Remove first staff from pool if exists
-            $key = array_search($firstDayStaffId, $staffPool);
-            if ($key !== false) {
-                unset($staffPool[$key]);
-                $staffPool = array_values($staffPool);
-            }
-            
-            // Evening shift goes to next staff in pool
-            $eveningStaffId = $this->getNextStaffFromPool($staffPool, $poolIndex, $assignments, $firstDate, $staffList);
-            $this->addShift($scheduleId, $eveningStaffId, $firstDate, SHIFT_SUNDAY_EVENING, 
-                          $SHIFT_TIMES[SHIFT_SUNDAY_EVENING]['start'], 
-                          $SHIFT_TIMES[SHIFT_SUNDAY_EVENING]['end']);
-            $assignments[$firstDate][] = $eveningStaffId;
-        } else {
-            $this->addShift($scheduleId, $firstDayStaffId, $firstDate, SHIFT_WEEKDAY_EVENING, 
-                          $SHIFT_TIMES[SHIFT_WEEKDAY_EVENING]['start'], 
-                          $SHIFT_TIMES[SHIFT_WEEKDAY_EVENING]['end']);
-            $assignments[$firstDate] = [$firstDayStaffId];
-            
-            // Remove first staff from pool if exists
-            $key = array_search($firstDayStaffId, $staffPool);
-            if ($key !== false) {
-                unset($staffPool[$key]);
-                $staffPool = array_values($staffPool);
-            }
-        }
-        
-        // Assign remaining days
-        for ($day = 2; $day <= $daysInMonth; $day++) {
-            $date = sprintf("%04d-%02d-%02d", $year, $month, $day);
-            $dayOfWeek = date('N', strtotime($date));
-            
-            if (!isset($assignments[$date])) {
-                $assignments[$date] = [];
-            }
-            
-            if ($dayOfWeek == 7) { // Sunday - 2 shifts
-                // Morning shift
-                $staffId = $this->getNextStaffFromPool($staffPool, $poolIndex, $assignments, $date, $staffList);
-                $this->addShift($scheduleId, $staffId, $date, SHIFT_SUNDAY_MORNING, 
-                              $SHIFT_TIMES[SHIFT_SUNDAY_MORNING]['start'], 
-                              $SHIFT_TIMES[SHIFT_SUNDAY_MORNING]['end']);
-                $assignments[$date][] = $staffId;
-                
-                // Evening shift
-                $staffId = $this->getNextStaffFromPool($staffPool, $poolIndex, $assignments, $date, $staffList);
-                $this->addShift($scheduleId, $staffId, $date, SHIFT_SUNDAY_EVENING, 
-                              $SHIFT_TIMES[SHIFT_SUNDAY_EVENING]['start'], 
-                              $SHIFT_TIMES[SHIFT_SUNDAY_EVENING]['end']);
-                $assignments[$date][] = $staffId;
+            if ($dayOfWeek == 7) { // Sunday
+                $shifts[] = ['date' => $date, 'day' => $day, 'dayOfWeek' => $dayOfWeek, 'type' => SHIFT_SUNDAY_MORNING];
+                $shifts[] = ['date' => $date, 'day' => $day, 'dayOfWeek' => $dayOfWeek, 'type' => SHIFT_SUNDAY_EVENING];
             } else { // Weekday
-                $staffId = $this->getNextStaffFromPool($staffPool, $poolIndex, $assignments, $date, $staffList);
-                $this->addShift($scheduleId, $staffId, $date, SHIFT_WEEKDAY_EVENING, 
-                              $SHIFT_TIMES[SHIFT_WEEKDAY_EVENING]['start'], 
-                              $SHIFT_TIMES[SHIFT_WEEKDAY_EVENING]['end']);
-                $assignments[$date][] = $staffId;
+                $shifts[] = ['date' => $date, 'day' => $day, 'dayOfWeek' => $dayOfWeek, 'type' => SHIFT_WEEKDAY_EVENING];
             }
+        }
+        
+        // CRITICAL: Track which staff have worked each specific shift pattern (day of week + shift type)
+        // shiftPatternAssignments["dayOfWeek_shiftType"] = [staffId1, staffId2, ...]
+        // Example: shiftPatternAssignments["1_WEEKDAY_EVENING"] = [5, 8] (Monday evening)
+        //          shiftPatternAssignments["7_SUNDAY_MORNING"] = [12, 5] (Sunday morning)
+        $shiftPatternAssignments = [];
+        
+        // Track staff shift count for fairness
+        $staffShiftCount = array_fill_keys($staffIds, 0);
+        
+        // Track last assigned staff to avoid consecutive assignments
+        $lastAssignedStaffId = null;
+        
+        // Assign first shift
+        $firstShift = $shifts[0];
+        $firstShiftPattern = $firstShift['dayOfWeek'] . '_' . $firstShift['type'];
+        
+        // If no first day staff specified, pick randomly from selected staff
+        if ($firstDayStaffId === null || $firstDayStaffId === 0) {
+            $firstDayStaffId = $staffIds[array_rand($staffIds)];
+        }
+        
+        $this->addShift($scheduleId, $firstDayStaffId, $firstShift['date'], $firstShift['type'],
+                       $SHIFT_TIMES[$firstShift['type']]['start'],
+                       $SHIFT_TIMES[$firstShift['type']]['end']);
+        $shiftPatternAssignments[$firstShiftPattern] = [$firstDayStaffId];
+        $staffShiftCount[$firstDayStaffId]++;
+        $lastAssignedStaffId = $firstDayStaffId;
+        
+        // Assign remaining shifts
+        for ($i = 1; $i < count($shifts); $i++) {
+            $shift = $shifts[$i];
+            $dayOfWeek = $shift['dayOfWeek'];
+            $shiftType = $shift['type'];
+            $shiftPattern = $dayOfWeek . '_' . $shiftType;
+            
+            // Find minimum and maximum shift counts
+            $minShifts = min($staffShiftCount);
+            $maxShifts = max($staffShiftCount);
+            
+            // Get staff who have already worked this shift pattern (same day of week + shift type)
+            $staffWorkedThisPattern = isset($shiftPatternAssignments[$shiftPattern]) ? $shiftPatternAssignments[$shiftPattern] : [];
+            
+            // Count how many times this pattern has been assigned
+            $patternAssignmentCount = count($staffWorkedThisPattern);
+            
+            // Create candidate list with multi-criteria scoring
+            $candidates = [];
+            foreach ($staffIds as $sid) {
+                $currentShifts = $staffShiftCount[$sid];
+                $hasWorkedThisPattern = in_array($sid, $staffWorkedThisPattern);
+                $isLastAssigned = ($sid === $lastAssignedStaffId);
+                
+                // Calculate score (lower is better)
+                // Priority 1: CRITICAL - Avoid same shift pattern until everyone has worked it
+                // If this person has worked this pattern AND not everyone has worked it yet, huge penalty
+                if ($hasWorkedThisPattern && $patternAssignmentCount < $staffCount) {
+                    $patternScore = 10000; // Effectively exclude them
+                } else {
+                    $patternScore = 0;
+                }
+                
+                // Priority 2: Balance - prefer those with fewer shifts
+                $balanceScore = ($currentShifts - $minShifts) * 100;
+                
+                // Priority 3: Avoid consecutive assignments
+                $consecutiveScore = $isLastAssigned ? 50 : 0;
+                
+                // Priority 4: Small randomness for variety
+                $randomScore = rand(0, 5);
+                
+                $totalScore = $patternScore + $balanceScore + $consecutiveScore + $randomScore;
+                
+                $candidates[] = [
+                    'id' => $sid,
+                    'score' => $totalScore,
+                    'count' => $currentShifts,
+                    'hasWorkedPattern' => $hasWorkedThisPattern,
+                    'isLastAssigned' => $isLastAssigned
+                ];
+            }
+            
+            // Sort by score (ascending - lower is better)
+            usort($candidates, function($a, $b) {
+                return $a['score'] - $b['score'];
+            });
+            
+            // Pick the best candidate
+            $selectedStaffId = $candidates[0]['id'];
+            
+            // If best candidate is last assigned AND there's a second option with similar score, pick second
+            if ($candidates[0]['isLastAssigned'] && count($candidates) > 1) {
+                if (($candidates[1]['score'] - $candidates[0]['score']) < 100) {
+                    $selectedStaffId = $candidates[1]['id'];
+                }
+            }
+            
+            $this->addShift($scheduleId, $selectedStaffId, $shift['date'], $shift['type'],
+                           $SHIFT_TIMES[$shift['type']]['start'],
+                           $SHIFT_TIMES[$shift['type']]['end']);
+            
+            // Track this assignment
+            if (!isset($shiftPatternAssignments[$shiftPattern])) {
+                $shiftPatternAssignments[$shiftPattern] = [];
+            }
+            $shiftPatternAssignments[$shiftPattern][] = $selectedStaffId;
+            $staffShiftCount[$selectedStaffId]++;
+            $lastAssignedStaffId = $selectedStaffId;
         }
         
         // Log history
         $this->addHistory($scheduleId, 'created', $generatedBy, 'Tạo lịch trực ngày tự động');
         
         return ['success' => true, 'scheduleId' => $scheduleId];
-    }
-    
-    /**
-     * Get next staff from pool avoiding consecutive shifts
-     */
-    private function getNextStaffFromPool(&$pool, &$index, $assignments, $currentDate, $staffList) {
-        $maxAttempts = count($pool);
-        $attempts = 0;
-        
-        // If pool is empty, refill it
-        if (empty($pool)) {
-            foreach ($staffList as $staff) {
-                $pool[] = $staff['id'];
-            }
-            shuffle($pool);
-            $index = 0;
-        }
-        
-        while ($attempts < $maxAttempts) {
-            if ($index >= count($pool)) {
-                // Reshuffle pool
-                shuffle($pool);
-                $index = 0;
-            }
-            
-            $staffId = $pool[$index];
-            
-            // Check if staff worked yesterday
-            $yesterday = date('Y-m-d', strtotime($currentDate . ' -1 day'));
-            $workedYesterday = isset($assignments[$yesterday]) && in_array($staffId, $assignments[$yesterday]);
-            
-            if (!$workedYesterday) {
-                unset($pool[$index]);
-                $pool = array_values($pool);
-                return $staffId;
-            }
-            
-            $index++;
-            $attempts++;
-        }
-        
-        // If all attempts failed, just take next (even if worked yesterday)
-        if (empty($pool)) {
-            // Pool is empty, refill
-            foreach ($staffList as $staff) {
-                $pool[] = $staff['id'];
-            }
-            shuffle($pool);
-            $index = 0;
-        }
-        
-        if ($index >= count($pool)) {
-            $index = 0;
-        }
-        
-        $staffId = $pool[$index];
-        unset($pool[$index]);
-        $pool = array_values($pool);
-        return $staffId;
     }
     
     /**

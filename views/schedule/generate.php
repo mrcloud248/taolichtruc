@@ -45,15 +45,16 @@ $staffList = $staffModel->getAllActive();
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">Nhân viên trực ngày đầu tiên <span class="text-danger">*</span></label>
-                        <select class="form-select" name="first_day_staff_id" required>
-                            <option value="">-- Chọn nhân viên --</option>
+                        <label class="form-label">Nhân viên trực ngày đầu tiên (tùy chọn)</label>
+                        <select class="form-select" name="first_day_staff_id">
+                            <option value="">-- Tự động chọn --</option>
                             <?php foreach ($staffList as $staff): ?>
                                 <option value="<?php echo $staff['id']; ?>">
                                     <?php echo htmlspecialchars($staff['name']); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <small class="text-muted">Để trống để hệ thống tự động chọn ngẫu nhiên</small>
                     </div>
                     
                     <div class="mb-3">
@@ -114,13 +115,6 @@ $staffList = $staffModel->getAllActive();
                     </div>
                     
                     <div class="mb-3">
-                        <label class="form-label">Số tuần <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" name="num_weeks" 
-                               value="52" min="1" max="52" required>
-                        <small class="text-muted">Số tuần cần tạo lịch (tối đa 52 tuần)</small>
-                    </div>
-                    
-                    <div class="mb-3">
                         <label class="form-label">Chọn nhân viên <span class="text-danger">*</span></label>
                         <div class="mb-2">
                             <button type="button" class="btn btn-sm btn-outline-success" id="selectAllWeekly">
@@ -142,7 +136,7 @@ $staffList = $staffModel->getAllActive();
                                 </div>
                             <?php endforeach; ?>
                         </div>
-                        <small class="text-muted">Chọn tất cả nhân viên tham gia lịch tuần</small>
+                        <small class="text-muted">Mỗi nhân viên sẽ được phân 1 Thứ 7. Số tuần = Số nhân viên được chọn</small>
                     </div>
                     
                     <div class="mb-3">
@@ -203,14 +197,10 @@ $(document).ready(function() {
             return;
         }
         
-        // Check if first day staff is in selected list
+        // Check if first day staff is in selected list (if specified)
         const firstDayStaffId = $('select[name="first_day_staff_id"]').val();
-        if (!firstDayStaffId) {
-            Swal.fire('Cảnh báo!', 'Vui lòng chọn nhân viên trực ngày đầu tiên', 'warning');
-            return;
-        }
         
-        if (!selectedStaff.includes(firstDayStaffId)) {
+        if (firstDayStaffId && !selectedStaff.includes(firstDayStaffId)) {
             Swal.fire('Cảnh báo!', 'Nhân viên trực ngày đầu tiên phải nằm trong danh sách nhân viên tham gia', 'warning');
             return;
         }
@@ -281,6 +271,7 @@ $(document).ready(function() {
         
         Swal.fire({
             title: 'Đang tạo lịch...',
+            html: `Tạo lịch cho <strong>${selectedStaff.length}</strong> nhân viên (${selectedStaff.length} tuần)`,
             allowOutsideClick: false,
             didOpen: () => {
                 Swal.showLoading();
@@ -290,6 +281,7 @@ $(document).ready(function() {
         const formData = $(this).serializeArray();
         formData.push({ name: 'action', value: 'generate_weekly' });
         formData.push({ name: 'staff_ids', value: JSON.stringify(selectedStaff) });
+        formData.push({ name: 'num_weeks', value: selectedStaff.length }); // Auto calculate
         
         $.ajax({
             url: '<?php echo BASE_URL; ?>/controllers/schedule_controller.php',

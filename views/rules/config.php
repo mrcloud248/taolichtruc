@@ -62,17 +62,20 @@ $rules = $ruleModel->getAll();
                 <h5 class="mb-0">Giải thích Rules</h5>
             </div>
             <div class="card-body">
-                <h6>1. Số ca liên tiếp tối đa</h6>
-                <p>Giới hạn số ca trực liên tiếp mà một nhân viên có thể đảm nhận để tránh quá tải.</p>
+                <h6>1. Phân bổ đều theo tháng</h6>
+                <p>Thuật toán ưu tiên phân chia số ca trực đều cho tất cả nhân viên. Mọi người sẽ có số ca gần bằng nhau trước khi ai đó nhận thêm ca.</p>
                 
-                <h6>2. Thời gian nghỉ tối thiểu</h6>
+                <h6>2. Luân phiên theo thứ trong tuần</h6>
+                <p>Mỗi nhân viên chỉ trực mỗi buổi (ví dụ: Tối thứ 2, Sáng CN) một lần cho đến khi tất cả mọi người đều đã trực buổi đó. Điều này đảm bảo công bằng và tránh một người phải trực cùng một thứ quá nhiều lần.</p>
+                
+                <h6>3. Tránh ca liên tiếp</h6>
+                <p>Hệ thống tránh phân công cùng một người trực nhiều ca liên tiếp để đảm bảo sự đa dạng và tránh quá tải.</p>
+                
+                <h6>4. Số ca liên tiếp tối đa</h6>
+                <p>Giới hạn số ca trực liên tiếp mà một nhân viên có thể đảm nhận (hiện tại: tối đa 2 ca liên tiếp).</p>
+                
+                <h6>5. Thời gian nghỉ tối thiểu</h6>
                 <p>Đảm bảo nhân viên có đủ thời gian nghỉ ngơi giữa các ca trực (tính bằng giờ).</p>
-                
-                <h6>3. Phân bổ đều theo tháng</h6>
-                <p>Thuật toán sẽ cố gắng phân chia số ca trực đều cho tất cả nhân viên trong tháng.</p>
-                
-                <h6>4. Tránh ca cuối tuần liên tiếp</h6>
-                <p>Tránh việc một nhân viên phải trực cuối tuần nhiều tuần liên tiếp.</p>
             </div>
         </div>
     </div>

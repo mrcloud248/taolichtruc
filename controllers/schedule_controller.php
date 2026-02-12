@@ -23,7 +23,9 @@ if (isAjax()) {
             case 'generate_daily':
                 $month = intval($_POST['month']);
                 $year = intval($_POST['year']);
-                $firstDayStaffId = intval($_POST['first_day_staff_id']);
+                $firstDayStaffId = isset($_POST['first_day_staff_id']) && $_POST['first_day_staff_id'] !== '' 
+                    ? intval($_POST['first_day_staff_id']) 
+                    : null;
                 $generatedBy = sanitize($_POST['generated_by']);
                 $staffIds = isset($_POST['staff_ids']) ? json_decode($_POST['staff_ids'], true) : null;
                 
